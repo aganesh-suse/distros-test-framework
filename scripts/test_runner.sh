@@ -1,4 +1,5 @@
 #!/bin/bash
+. ./config/k3s.source
 
 function validateTestAndImage() {
  if [ -z "${TEST_DIR}" ]; then

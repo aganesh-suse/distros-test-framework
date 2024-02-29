@@ -66,6 +66,12 @@ resource "aws_instance" "master" {
     source      = "../install/node_role.sh"
     destination = "/tmp/node_role.sh"
   }
+    provisioner "remote-exec" {
+    inline = [
+      "if [[ ${var.node_os} == \"slemicro\" ]]; then; sudo transactional-update setup-selinux; sudo reboot; fi",
+      "sleep 60",
+    ]
+  }
   provisioner "remote-exec" {
     inline = [
       "chmod +x /tmp/node_role.sh",
