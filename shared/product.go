@@ -97,6 +97,7 @@ func ManageService(product, action, nodeType string, ips []string) (string, erro
 
 // CertRotate certificate rotate for k3s or rke2
 func CertRotate(product string, ips []string) (string, error) {
+	product = fmt.Sprintf("-E env \"PATH=$PATH:/usr/local/bin\" %s", product)
 	if len(ips) == 0 {
 		return "", ReturnLogError("ips string array cannot be empty")
 	}
