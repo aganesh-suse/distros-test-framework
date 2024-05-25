@@ -98,7 +98,7 @@ node {
                       docker run --name ${containername} -t --env-file ${envFile} --env-file ./config/.env ${imageName} sh -c \\
                       "chmod 400 /go/src/github.com/rancher/distros-test-framework/config/.ssh/aws_key.pem && cd ./entrypoint && go test -timeout=${timeout} -v ./${testname}/... ${TEST_ARGS.replace("\"", "\\\"")}"
                       """                  
-                      build(job: "job-${testname}")
+                      // build(job: "job-${testname}")
                   }
 
                 }
@@ -115,14 +115,11 @@ node {
               stage('Cleanup') {
                 // Stop and remove containers and images, but don't fail job if these fail for whatever reason (generally due to a previous step failing)
                 for (int i = 0; i < testdir.size(); i++) {
-                  def containername = "${testContainer}_${testdir[i]}_${i}" 
-                  sh "docker stop ${containername} || true"
-                  sh "docker rm -v ${containername} || true"
-                  sh "docker rmi -f ${containername} || true"                 
-                  // sh "docker stop ${testContainer}_${testdir[i]}_${i} || true"
-                  // sh "docker rm -v ${testContainer}_${testdir[i]}_${i} || true"
-                  // sh "docker rmi -f ${imageName}_${testdir[i]}_${i} || true"
+                  def rmcontainername = "${testContainer}_${testdir[i]}_${i}" 
+                  sh "docker stop ${rmcontainername} || true"
+                  sh "docker rm -v ${rmcontainername} || true"
                 }
+                sh "docker rmi -f ${imageName} || true"
               }
             } // finally
           } // dir
