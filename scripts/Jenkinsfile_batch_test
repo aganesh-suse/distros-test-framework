@@ -94,7 +94,7 @@ node {
                     jobs[testname] = { ->           
                         echo "${testname}"                   
                         sh """
-                        docker run --name ${testContainer} -t --env-file ${envFile} --env-file ./config/.env ${imageName} sh -c \\
+                        docker run --name ${testContainer}_${i} -t --env-file ${envFile} --env-file ./config/.env ${imageName} sh -c \\
                         "chmod 400 /go/src/github.com/rancher/distros-test-framework/config/.ssh/aws_key.pem && cd ./entrypoint && go test -timeout=${timeout} -v ./${testname}/... ${TEST_ARGS.replace("\"", "\\\"")}"
                         """                  
                         build(job: "job-${testname}")
@@ -112,9 +112,11 @@ node {
             } finally {
               stage('Cleanup') {
                 // Stop and remove containers and images, but don't fail job if these fail for whatever reason (generally due to a previous step failing)
-                sh "docker stop ${testContainer} || true"
-                sh "docker rm -v ${testContainer} || true"
-                sh "docker rmi -f ${imageName} || true"
+                for (int i = 0; i < testdir.size(); i++) {
+                  sh "docker stop ${testContainer}_${i} || true"
+                  sh "docker rm -v ${testContainer}_${i} || true"
+                  sh "docker rmi -f ${imageName}_${i} || true"
+                }
               }
             } // finally
           } // dir
