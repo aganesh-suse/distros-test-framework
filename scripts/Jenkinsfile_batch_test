@@ -89,18 +89,17 @@ node {
                 echo "Running ${testdir.size()} tests: ${testdir}"
                 def jobs = [:]
                 for (int i = 0; i < testdir.size(); i++) {
-                    stage("${testname}") {
-                      def testname = testdir[i]
-                      echo "running ${testname}"
-                      jobs[testname] = { ->           
-                          echo "${testname}"                   
-                          sh """
-                          docker run --name ${testContainer}_${i} -t --env-file ${envFile} --env-file ./config/.env ${imageName} sh -c \\
-                          "chmod 400 /go/src/github.com/rancher/distros-test-framework/config/.ssh/aws_key.pem && cd ./entrypoint && go test -timeout=${timeout} -v ./${testname}/... ${TEST_ARGS.replace("\"", "\\\"")}"
-                          """                  
-                          build(job: "job-${testname}")
-                      }
-                    }
+                  def testname = testdir[i]
+                  echo "running ${testname}"
+                  jobs[testname] = { ->           
+                      echo "${testname}"                   
+                      sh """
+                      docker run --name ${testContainer}_${i} -t --env-file ${envFile} --env-file ./config/.env ${imageName} sh -c \\
+                      "chmod 400 /go/src/github.com/rancher/distros-test-framework/config/.ssh/aws_key.pem && cd ./entrypoint && go test -timeout=${timeout} -v ./${testname}/... ${TEST_ARGS.replace("\"", "\\\"")}"
+                      """                  
+                      build(job: "job-${testname}")
+                  }
+
                 }
 
                 parallel jobs
