@@ -65,7 +65,7 @@ subscription_manager() {
 }
 
 disable_cloud_setup() {
-  if [[ "$node_os" = *"rhel"* ]] || [[ "$node_os" = "centos8" ]] || [[ "$node_os" = *"oracle"* ]]; then
+  if [[ "$node_os" = *"rhel"* ]] || [[ "$node_os" = "centos8" ]] || [[ "$node_os" = *"oracle"* ]] || [[ "$node_os" = "slemicro" ]]; then
     if systemctl is-enabled --quiet nm-cloud-setup.service 2>/dev/null; then
       systemctl disable nm-cloud-setup.service
     else
@@ -79,6 +79,13 @@ disable_cloud_setup() {
     fi
   fi
 }
+
+# prep_slemicro() {
+#   if [[ "$node_os" = "slemicro" ]]; then
+#     sudo transactional-update setup-selinux; sudo reboot
+#     sleep 60
+#   fi
+# }
 
 install_k3s() {
   url="https://get.k3s.io"
@@ -94,6 +101,10 @@ install_k3s() {
     exit 1
   fi
 
+  # if [[ "$node_os" = "slemicro" ]]; then
+  #   sudo reboot
+  #   sleep 60
+  # fi
 }
 
 check_service() {

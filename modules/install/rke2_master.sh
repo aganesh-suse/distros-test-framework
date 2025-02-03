@@ -1,7 +1,7 @@
 #!/bin/bash
 # This script installs the first server, ensuring first server is installed
 # and ready before proceeding to install other nodes
-
+echo "Script inputs:"
 echo "$@"
 
 PS4='+(${LINENO}): '
@@ -67,7 +67,7 @@ subscription_manager() {
 }
 
 disable_cloud_setup() {
-  if [[ "$node_os" = *"rhel"* ]] || [[ "$node_os" = "centos8" ]] || [[ "$node_os" = *"oracle"* ]]; then
+  if [[ "$node_os" = *"rhel"* ]] || [[ "$node_os" = "centos8" ]] || [[ "$node_os" = *"oracle"* ]] || [[ "$node_os" = "slemicro" ]]; then
     if systemctl is-enabled --quiet nm-cloud-setup.service 2>/dev/null; then
       systemctl disable nm-cloud-setup.service
     else
@@ -93,6 +93,17 @@ cis_setup() {
   if [ -n "$server_flags" ] && [[ "$server_flags" == *"cis"* ]]; then
     if [[ "$node_os" == *"rhel"* ]] || [[ "$node_os" == *"centos"* ]] || [[ "$node_os" == *"oracle"* ]]; then
       cp -f /usr/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
+    elif [[ "$node_os" == *"slemicro"* ]]; then
+        if [[ "$install_method" == "tar" ]]; then
+          cp -f /opt/rke2/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
+          cat <<EOF >>.bashrc
+export PATH=$PATH:/opt/rke2/bin
+EOF
+          source .bashrc
+          echo "Set .bashrc to have PATH set to /opt/rke2/bin"
+        else
+          cp -f /usr/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
+        fi
     else
       cp -f /usr/local/share/rke2/rke2-cis-sysctl.conf /etc/sysctl.d/60-rke2-cis.conf
     fi
@@ -114,11 +125,16 @@ install_rke2() {
   fi
 
   install_cmd="curl -sfL $url | $params sh -"
-
+  echo "Install Command:\\n $install_cmd"
   if ! eval "$install_cmd"; then
     echo "Failed to install rke2-server on node ip: $public_ip"
     exit 1
   fi
+
+  # if [[ "$node_os" = "slemicro" ]]; then
+  #   sudo reboot || true
+  #   sleep 60
+  # fi
 }
 
 install_dependencies() {
@@ -183,6 +199,7 @@ main() {
   update_config
   subscription_manager
   disable_cloud_setup
+  # prep_slemicro
   install
   config_files
   wait_nodes
