@@ -42,6 +42,15 @@ resource "aws_instance" "worker" {
     Name = "${var.resource_name}-${local.resource_tag}-worker${count.index + 1}"
     "kubernetes.io/cluster/clusterid" = "owned"
   }
+  provisioner "remote-exec" {
+    inline = [
+      "echo \"${var.node_os}\" | grep -q \"slemicro\" && sudo transactional-update setup-selinux",
+      "echo \"${var.node_os}\" | grep -q \"slemicro\" && sudo reboot || exit 0",
+    ]
+  }
+  provisioner "local-exec" {
+    command = "echo \"${var.node_os}\" | grep -q \"slemicro\" && sleep 60"
+  }
   provisioner "file" {
     source = "../install/join_rke2_agent.sh"
     destination = "/tmp/join_rke2_agent.sh"
@@ -52,6 +61,15 @@ resource "aws_instance" "worker" {
       sudo /tmp/join_rke2_agent.sh ${var.node_os} ${local.master_ip} "${local.node_token}" ${self.public_ip} ${self.private_ip} "${var.enable_ipv6 ? self.ipv6_addresses[0] : ""}" ${var.install_mode} ${var.rke2_version} "${var.rke2_channel}" "${var.install_method}" "${var.worker_flags}" ${var.username} ${var.password} 
     EOT
     ]
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "echo \"${var.node_os}\" | grep -q \"slemicro\" && sudo reboot || exit 0",
+    ]
+  }
+
+  provisioner "local-exec" {
+    command = "echo \"${var.node_os}\" | grep -q \"slemicro\" && sleep 60"
   }
 }
 
