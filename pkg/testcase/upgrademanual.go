@@ -33,6 +33,7 @@ func TestUpgradeClusterManual(cluster *shared.Cluster, k8sClient *k8s.Client, ve
 
 	// Initialize aws client in case reboot is needed for slemicro
 	nodeOS := os.Getenv("node_os")
+	shared.LogLevel("debug", "Testing Node OS: %s", nodeOS)
 	var awsClient *aws.Client
 	var clientErr error
 	if nodeOS == "slemicro" {
@@ -72,16 +73,11 @@ func TestUpgradeClusterManual(cluster *shared.Cluster, k8sClient *k8s.Client, ve
 }
 
 func rebootInstances(awsClient *aws.Client, ip string) {
-	// awsClient, err := aws.AddClient(cluster)
-	// Expect(err).NotTo(HaveOccurred())
 	serverInstanceID, getErr := awsClient.GetInstanceIDByIP(ip)
 	Expect(getErr).NotTo(HaveOccurred())
-	// rebootInstance(awsDependencies, serverInstanceID)
 	shared.LogLevel("debug", "Rebooting instance id: %s", serverInstanceID)
 	rebootError := awsClient.RebootInstance(serverInstanceID)
 	Expect(rebootError).NotTo(HaveOccurred())
-	shared.LogLevel("debug", "Reboot was a success")
-	// if _,rebooterr := awsClient.ec2.RebootInstance(instanceID)
 }
 
 // upgradeProduct upgrades a node server or agent type to the specified version.
@@ -93,12 +89,10 @@ func upgradeProduct(awsClient *aws.Client, product, nodeType, installType, ip, n
 		return err
 	}
 
-	// if node_os is slemicro - reboot the node. before restart/status check of service.
-	// nodeOS := os.Getenv("node_os")
 	if nodeOS == "slemicro" {
-		shared.LogLevel("debug", "Calling reboot instances for slemicro")
 		rebootInstances(awsClient, ip)
 	}
+
 	actions := []shared.ServiceAction{
 		{Service: product, Action: restart, NodeType: nodeType, ExplicitDelay: 180},
 		{Service: product, Action: status, NodeType: nodeType, ExplicitDelay: 30},
