@@ -107,6 +107,7 @@ func (r *RancherDay1) ConnectRancher() {
 	Eventually(func() error {
 		return r.api.Login(context.Background(), "admin", string(password))
 	}, "5m", "15s").Should(Succeed(), "log in to rancher API at %s", r.baseURL)
+	waitRancherWebhook()
 
 	spki := ""
 	if caPEM != "" {
@@ -347,8 +348,8 @@ func (r *RancherDay1) UpgradeImported() {
 	r.openAndShoot(clusterListPath, day1ImportCluster, "imported-upgraded-"+r.Version)
 }
 
-// CollectDebug saves Rancher, Kubernetes and node logs plus a failure screenshot for a failed spec.
-func (r *RancherDay1) CollectDebug(spec string) {
+// CollectDebug saves the failure, Rancher, Kubernetes and node logs plus a screenshot for a failed spec.
+func (r *RancherDay1) CollectDebug(spec, failure string) {
 	r.debugRuns++
 	dir := filepath.Join(r.artifactsDir, "debug", fmt.Sprintf("%02d", r.debugRuns))
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -364,7 +365,7 @@ func (r *RancherDay1) CollectDebug(spec string) {
 		}
 	}
 
-	save("spec.txt", spec, nil)
+	save("spec.txt", spec+"\n\n"+failure+"\n", nil)
 	rancherLogs, err := rancherKubectl("logs", "-n", "cattle-system", "-l", "app=rancher", "--tail=500", "--prefix")
 	save("rancher.log", rancherLogs, err)
 	for name, args := range map[string][]string{
@@ -537,8 +538,11 @@ func createRancherCluster(name, version string) string {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(f.Close()).To(Succeed())
 
-	_, err = rancherKubectl("apply", "-f", f.Name())
-	Expect(err).NotTo(HaveOccurred(), "create rancher cluster %s", name)
+	// The webhook validating clusters can still be restarting right after Rancher's first start.
+	Eventually(func() error {
+		_, err = rancherKubectl("apply", "-f", f.Name())
+		return err
+	}, "5m", "10s").Should(Succeed(), "create rancher cluster %s", name)
 
 	var id string
 	Eventually(func() string {
@@ -611,8 +615,6 @@ func (r *RancherDay1) createNodes(suffixes ...string) (ips, privateIPs []string)
 }
 
 func (r *RancherDay1) waitClusterVersion(name, id, kubectlIP, version string, nodes int, timeout string) {
-	// Nodes and Rancher report an RC as its release version, e.g. v1.35.11-rc1+rke2r1 as v1.35.11+rke2r1.
-	reportedVersion := rancher.ReportedVersion(version)
 	Eventually(func(g Gomega) {
 		ready, err := rancherKubectl("get", "clusters.provisioning.cattle.io", "-n", rancher.FleetNamespace, name,
 			"-o", "jsonpath={.status.ready}")
@@ -622,14 +624,15 @@ func (r *RancherDay1) waitClusterVersion(name, id, kubectlIP, version string, no
 		reported, err := rancherKubectl("get", "clusters.management.cattle.io", id,
 			"-o", "jsonpath={.status.version.gitVersion}")
 		g.Expect(err).NotTo(HaveOccurred())
-		g.Expect(reported).To(Equal(reportedVersion), "rancher reports %s at %q", name, reported)
+		g.Expect(rancher.VersionMatches(reported, version)).To(BeTrue(), "rancher reports %s at %q", name, reported)
 
 		kubelets, err := onNode(kubectlIP, downstreamKubectl(r.Product)+
 			" get nodes -o jsonpath='{.items[*].status.nodeInfo.kubeletVersion}'", time.Minute)
 		g.Expect(err).NotTo(HaveOccurred())
 		g.Expect(strings.Fields(kubelets)).To(HaveLen(nodes), "%s node count", name)
-		g.Expect(strings.Fields(kubelets)).To(HaveEach(Equal(reportedVersion)),
-			"%s nodes not all on %s", name, reportedVersion)
+		for _, kubelet := range strings.Fields(kubelets) {
+			g.Expect(rancher.VersionMatches(kubelet, version)).To(BeTrue(), "%s node still on %s", name, kubelet)
+		}
 	}, timeout, "20s").Should(Succeed(), "%s did not become ready on %s", name, version)
 	resources.LogLevel("info", "%s is ready on %s with %d nodes", name, version, nodes)
 }
@@ -690,6 +693,29 @@ func rancherKubectl(args ...string) (string, error) {
 	out, err := resources.RunHostArgsQuietContext(ctx, "kubectl", args...)
 
 	return strings.TrimSpace(out), err
+}
+
+// waitRancherWebhook waits for rancher-webhook, which Rancher installs shortly after its own pods
+// are ready; until it serves, the fail-closed webhook rejects every cluster create and patch.
+func waitRancherWebhook() {
+	Eventually(func(g Gomega) {
+		out, err := rancherKubectl("get", "deployment", "-n", "cattle-system", "rancher-webhook",
+			"-o", "jsonpath={.status.observedGeneration}/{.metadata.generation} {.status.updatedReplicas}/"+
+				"{.status.readyReplicas}/{.spec.replicas}")
+		g.Expect(err).NotTo(HaveOccurred(), "rancher-webhook deployment not created yet")
+		g.Expect(webhookRolledOut(out)).To(BeTrue(), "rancher-webhook rollout %q", out)
+	}, "10m", "10s").Should(Succeed(), "rancher-webhook never became ready")
+	resources.LogLevel("info", "rancher-webhook is ready")
+}
+
+// webhookRolledOut parses "observedGen/gen updated/ready/replicas" and reports a finished rollout.
+func webhookRolledOut(status string) bool {
+	var observed, gen, updated, ready, replicas int
+	if _, err := fmt.Sscanf(status, "%d/%d %d/%d/%d", &observed, &gen, &updated, &ready, &replicas); err != nil {
+		return false
+	}
+
+	return replicas > 0 && observed >= gen && updated == replicas && ready == replicas
 }
 
 func setRancherSetting(name, value string) {

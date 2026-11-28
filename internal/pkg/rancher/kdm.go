@@ -155,7 +155,8 @@ func VersionUnderTest(installVersion, k8sVersion string) (string, error) {
 
 var rcSuffix = regexp.MustCompile(`-rc\d+`)
 
-// ReportedVersion is how kubelets and Rancher report a version: RC builds drop the -rcN suffix.
-func ReportedVersion(version string) string {
-	return rcSuffix.ReplaceAllString(version, "")
+// VersionMatches reports whether a kubelet or Rancher reported version is version. RKE2 RC builds
+// report without -rcN (v1.35.11+rke2r1), K3s RC builds keep it (v1.37.3-rc1+k3s1).
+func VersionMatches(reported, version string) bool {
+	return reported == version || reported == rcSuffix.ReplaceAllString(version, "")
 }

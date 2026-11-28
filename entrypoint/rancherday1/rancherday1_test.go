@@ -67,7 +67,7 @@ var _ = AfterEach(func() {
 	switch {
 	case report.Failed():
 		fmt.Printf("\nFAILED! %s\n\n", report.FullText())
-		day1.CollectDebug(report.LeafNodeText)
+		day1.CollectDebug(report.LeafNodeText, report.Failure.Message+"\n"+report.Failure.Location.String())
 	case report.State == types.SpecStateSkipped:
 		fmt.Printf("\nSKIPPED! %s\n\n", report.FullText())
 	default:

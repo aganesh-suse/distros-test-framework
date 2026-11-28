@@ -339,14 +339,21 @@ func TestVersionUnderTest(t *testing.T) {
 	}
 }
 
-func TestReportedVersion(t *testing.T) {
-	for in, want := range map[string]string{
-		"v1.35.11-rc1+rke2r1": "v1.35.11+rke2r1", // node VERSION observed on a v1.35.11-rc1 install
-		"v1.37.3-rc12+k3s1":   "v1.37.3+k3s1",
-		"v1.35.10+rke2r1":     "v1.35.10+rke2r1",
-	} {
-		if got := ReportedVersion(in); got != want {
-			t.Errorf("ReportedVersion(%q) = %q, want %q", in, got, want)
+func TestVersionMatches(t *testing.T) {
+	cases := []struct {
+		reported, version string
+		want              bool
+	}{
+		{"v1.35.11+rke2r1", "v1.35.11-rc1+rke2r1", true}, // rke2 RC node, observed on Rancher 2.14
+		{"v1.37.3-rc1+k3s1", "v1.37.3-rc1+k3s1", true},   // k3s RC node, observed on Rancher 2.16
+		{"v1.35.10+rke2r1", "v1.35.10+rke2r1", true},     // released version
+		{"v1.37.2+k3s1", "v1.37.3-rc1+k3s1", false},      // upgrade not done yet
+		{"v1.37.3-rc2+k3s1", "v1.37.3-rc1+k3s1", false},  // a different RC
+		{"v1.37.3+k3s1", "v1.37.3+k3s2", false},          // a different release
+	}
+	for _, c := range cases {
+		if got := VersionMatches(c.reported, c.version); got != c.want {
+			t.Errorf("VersionMatches(%q, %q) = %v, want %v", c.reported, c.version, got, c.want)
 		}
 	}
 }
