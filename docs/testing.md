@@ -182,7 +182,8 @@ Steps run with `ContinueOnFailure`: the import and its upgrade still run when a 
 
 Artifacts are written to `artifacts/rancherday1/`. Jenkins archives them as build artifacts, except `rancher-access.txt`, which holds the admin password: Jenkins deletes it instead of archiving it. On Jenkins, the admin password is therefore the job's `bootstrapPassword` chart arg, or, if that's unset, Rancher's `bootstrap-secret`.
 - `screenshots/NN-*.png`: the dropdowns, plus every cluster after each successful operation.
-- `debug/NN/`: written per failed spec. It holds Rancher logs, provisioning/control-plane/machine/snapshot objects, events, downstream node journals, cluster-agent logs, a failure screenshot and the browser console.
+- `debug/NN/`: written per failed spec. It holds the failure message (`spec.txt`), Rancher logs, provisioning/control-plane/machine/snapshot objects, events, downstream node journals, cluster-agent logs and the browser console.
+- `screenshots/NN-FAILED-<spec>-page.png` and `NN-FAILED-<spec>-clusters.png`, per failed spec. The first is the page the browser was on; it explains UI failures, but for API-driven steps it's whatever an earlier UI step left open. The second is a fresh Cluster Management list showing every cluster's state and version at the time of the failure.
 
 Credentials: the browser authenticates with an API session token set as an `httpOnly` cookie, so no password is typed or rendered. A screenshot is refused when the page shows the bootstrap password, the session token or a registration token. Registration and import commands are sent over SSH stdin, so their tokens never appear in logs or errors.
 

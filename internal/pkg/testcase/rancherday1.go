@@ -410,13 +410,24 @@ func (r *RancherDay1) saveBrowserDebug(spec string) {
 	if r.browser == nil {
 		return
 	}
-	if path, err := r.browser.Screenshot("FAILED-" + spec); err != nil {
-		resources.LogLevel("warn", "failure screenshot: %v", err)
+	// The open page is whatever the last UI step left, so it only explains UI failures;
+	// a fresh cluster list shows every cluster's state and version when the failure happened.
+	r.failureShot("FAILED-" + spec + "-page")
+	if err := r.browser.Open(clusterListPath, "local", 2*time.Minute); err != nil {
+		resources.LogLevel("warn", "open cluster list for failure screenshot: %v", err)
 	} else {
-		resources.LogLevel("info", "Failure screenshot: %s", path)
+		r.failureShot("FAILED-" + spec + "-clusters")
 	}
 	if _, err := r.browser.SaveConsole(fmt.Sprintf("debug-%02d", r.debugRuns)); err != nil {
 		resources.LogLevel("warn", "save browser console: %v", err)
+	}
+}
+
+func (r *RancherDay1) failureShot(name string) {
+	if path, err := r.browser.Screenshot(name); err != nil {
+		resources.LogLevel("warn", "failure screenshot %s: %v", name, err)
+	} else {
+		resources.LogLevel("info", "Failure screenshot: %s", path)
 	}
 }
 
